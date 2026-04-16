@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and authentication data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["ketua_rt", "bendahara", "sekretaris", "warga"] },
+        "address": { "type": "string" },
+        "block": { "type": "string" },
+        "houseNumber": { "type": "string" },
+        "phone": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "ktpUrl": { "type": "string" },
+        "kkUrl": { "type": "string" },
+        "isVerified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "Kas": {
+      "title": "Kas",
+      "description": "Financial records for RT cash",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["in", "out"] },
+        "category": { "type": "string", "enum": ["iuran_bulanan", "insentif_wifi", "dana_sosial", "iuran_security", "iuran_sampah", "kegiatan_rt"] },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "category", "amount", "date", "createdAt"]
+    },
+    "Media": {
+      "title": "Media",
+      "description": "Event media/slideshow items",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "imageUrl", "date", "createdAt"]
+    },
+    "Iuran": {
+      "title": "Iuran",
+      "description": "Resident payment records",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "amount": { "type": "number" },
+        "month": { "type": "string" },
+        "year": { "type": "number" },
+        "status": { "type": "string", "enum": ["lunas", "belum"] },
+        "paidAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "amount", "month", "year", "status"]
+    },
+    "Laporan": {
+      "title": "Laporan",
+      "description": "Resident reports/complaints",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "proses", "selesai"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "description", "status", "createdAt"]
+    },
+    "Surat": {
+      "title": "Surat",
+      "description": "Letter requests",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "type": { "type": "string" },
+        "purpose": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "proses", "selesai", "ditolak"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "purpose", "status", "createdAt"]
+    },
+    "Berita": {
+      "title": "Berita",
+      "description": "News and announcements",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "authorId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "category", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/iuran/{iuranId}": {
+      "schema": "Iuran",
+      "description": "Payment records"
+    },
+    "/laporan/{laporanId}": {
+      "schema": "Laporan",
+      "description": "Resident reports"
+    },
+    "/surat/{suratId}": {
+      "schema": "Surat",
+      "description": "Letter requests"
+    },
+    "/berita/{beritaId}": {
+      "schema": "Berita",
+      "description": "News and announcements"
+    },
+    "/media/{mediaId}": {
+      "schema": "Media",
+      "description": "Event media/slideshow"
+    },
+    "/kas/{kasId}": {
+      "schema": "Kas",
+      "description": "Financial records"
+    }
+  }
+}

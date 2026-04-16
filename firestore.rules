@@ -1,0 +1,264 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: {userId}
+// Fields:
+//   - uid: string (required, immutable)
+//   - name: string (required)
+//   - email: string (required, immutable)
+//   - role: string (required, enum: ['admin', 'warga'])
+//   - address: string (optional)
+//   - phone: string (optional)
+//   - photoURL: string (optional)
+//   - createdAt: timestamp (required, immutable)
+//
+// Collection: iuran
+// Document ID: {iuranId}
+// Fields:
+//   - userId: string (required, immutable)
+//   - userName: string (required)
+//   - amount: number (required, positive)
+//   - month: string (required)
+//   - year: number (required)
+//   - status: string (required, enum: ['lunas', 'belum'])
+//   - paidAt: timestamp (optional)
+//
+// Collection: laporan
+// Document ID: {laporanId}
+// Fields:
+//   - userId: string (required, immutable)
+//   - userName: string (required)
+//   - title: string (required, max 100 chars)
+//   - description: string (required, max 1000 chars)
+//   - status: string (required, enum: ['pending', 'proses', 'selesai'])
+//   - createdAt: timestamp (required, immutable)
+//
+// Collection: surat
+// Document ID: {suratId}
+// Fields:
+//   - userId: string (required, immutable)
+//   - userName: string (required)
+//   - type: string (required)
+//   - purpose: string (required, max 500 chars)
+//   - status: string (required, enum: ['pending', 'proses', 'selesai', 'ditolak'])
+//   - createdAt: timestamp (required, immutable)
+//
+// Collection: berita
+// Document ID: {beritaId}
+// Fields:
+//   - title: string (required, max 200 chars)
+//   - content: string (required, max 5000 chars)
+//   - category: string (required)
+//   - authorId: string (required, immutable)
+//   - createdAt: timestamp (required, immutable)
+//
+// Collection: media
+// Document ID: {mediaId}
+// Fields:
+//   - title: string (required)
+//   - imageUrl: string (required)
+//   - date: string (required)
+//   - createdAt: timestamp (required, immutable)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() &&
+        (
+          (request.auth.token.email == "muhammad.adjiprasetyo28@gmail.com" && request.auth.token.email_verified == true) ||
+          (request.auth.token.email == "adjiprasetyo4@gmail.com" && request.auth.token.email_verified == true) ||
+          (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'ketua_rt')
+        );
+    }
+
+    function isBendahara() {
+      return isAuthenticated() &&
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'bendahara');
+    }
+
+    function isSekretaris() {
+      return isAuthenticated() &&
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'sekretaris');
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidString(field, min, max) {
+      return request.resource.data[field] is string && 
+             request.resource.data[field].size() >= min && 
+             request.resource.data[field].size() <= max;
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'role', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             data.email == request.auth.token.email &&
+             data.role in ['ketua_rt', 'bendahara', 'sekretaris', 'warga'] &&
+             data.createdAt is timestamp &&
+             (!('ktpUrl' in data) || data.ktpUrl is string) &&
+             (!('kkUrl' in data) || data.kkUrl is string) &&
+             (!('isVerified' in data) || data.isVerified is bool);
+    }
+
+    function isValidIuran(data) {
+      return hasRequiredFields(['userId', 'userName', 'amount', 'month', 'year', 'status']) &&
+             data.userId is string &&
+             data.amount is number && data.amount > 0 &&
+             data.status in ['lunas', 'belum'];
+    }
+
+    function isValidKas(data) {
+      return hasRequiredFields(['type', 'category', 'amount', 'date', 'createdAt']) &&
+             data.type in ['in', 'out'] &&
+             data.category in ['iuran_bulanan', 'insentif_wifi', 'dana_sosial', 'iuran_security', 'iuran_sampah', 'kegiatan_rt'] &&
+             data.amount is number && data.amount > 0 &&
+             data.date is string &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidLaporan(data) {
+      return hasRequiredFields(['userId', 'userName', 'title', 'description', 'status', 'createdAt']) &&
+             data.userId is string &&
+             isValidString('title', 1, 100) &&
+             isValidString('description', 1, 1000) &&
+             data.status in ['pending', 'proses', 'selesai'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidSurat(data) {
+      return hasRequiredFields(['userId', 'userName', 'type', 'purpose', 'status', 'createdAt']) &&
+             data.userId is string &&
+             data.type is string &&
+             isValidString('purpose', 1, 500) &&
+             data.status in ['pending', 'proses', 'selesai', 'ditolak'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidBerita(data) {
+      return hasRequiredFields(['title', 'content', 'category', 'createdAt']) &&
+             isValidString('title', 1, 200) &&
+             isValidString('content', 1, 5000) &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidKalender(data) {
+      return hasRequiredFields(['title', 'date', 'description', 'createdAt']) &&
+             data.title is string &&
+             data.date is string &&
+             data.description is string &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidMedia(data) {
+      return hasRequiredFields(['title', 'imageUrl', 'date', 'createdAt']) &&
+             data.title is string &&
+             data.imageUrl is string &&
+             data.date is string &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == 'warga';
+      allow update: if isAuthenticated() && (
+        (isOwner(userId) && isValidUser(request.resource.data) && request.resource.data.role == resource.data.role) || 
+        isAdmin()
+      );
+    }
+
+    match /iuran/{iuranId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isBendahara()) && isValidIuran(request.resource.data);
+      allow update: if (isAdmin() || isBendahara()) && isValidIuran(request.resource.data);
+      allow delete: if isAdmin() || isBendahara();
+    }
+
+    match /laporan/{laporanId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isVerified == true &&
+                      isValidLaporan(request.resource.data);
+      allow update: if isAuthenticated() && (
+        (isOwner(resource.data.userId) && isValidLaporan(request.resource.data) && request.resource.data.status == resource.data.status) ||
+        isAdmin() || isSekretaris()
+      );
+      allow delete: if isAdmin() || isOwner(resource.data.userId);
+    }
+
+    match /surat/{suratId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.userId) || isAdmin());
+      allow create: if isAuthenticated() && 
+                      get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isVerified == true &&
+                      isValidSurat(request.resource.data);
+      allow update: if isAdmin() && isValidSurat(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /berita/{beritaId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isSekretaris()) && isValidBerita(request.resource.data);
+      allow update: if (isAdmin() || isSekretaris()) && isValidBerita(request.resource.data);
+      allow delete: if isAdmin() || isSekretaris();
+    }
+
+    match /media/{mediaId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isSekretaris()) && isValidMedia(request.resource.data);
+      allow update: if (isAdmin() || isSekretaris()) && isValidMedia(request.resource.data);
+      allow delete: if isAdmin() || isSekretaris();
+    }
+
+    match /kalender/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isSekretaris()) && isValidKalender(request.resource.data);
+      allow update: if (isAdmin() || isSekretaris()) && isValidKalender(request.resource.data);
+      allow delete: if isAdmin() || isSekretaris();
+    }
+
+    match /kas/{kasId} {
+      allow read: if isAuthenticated();
+      allow create: if (isAdmin() || isBendahara()) && isValidKas(request.resource.data);
+      allow update: if (isAdmin() || isBendahara()) && isValidKas(request.resource.data);
+      allow delete: if isAdmin() || isBendahara();
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}
